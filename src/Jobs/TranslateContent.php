@@ -1,7 +1,6 @@
 <?php
 
 namespace AiTranslator\Jobs;
-use Statamic\Facades\Search;
 
 
 use Illuminate\Bus\Queueable;
@@ -11,18 +10,9 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Statamic\Facades\Entry;
 use Statamic\Facades\Collection;
-use Illuminate\Http\Request;
 use Statamic\Fieldtypes\Bard\Augmentor;
-
-use Illuminate\Support\Facades\Config;
 use Statamic\Facades\Fieldset;
-
-
-use Statamic\Facades\Blueprint;
-
 use Statamic\Facades\Content;
-use App\Helpers\Utils;
-use Illuminate\Support\Facades\Http;
 
 
 class TranslateContent implements ShouldQueue
@@ -179,12 +169,6 @@ class TranslateContent implements ShouldQueue
 
         $this->dumpTranslatedPaths($this->dataToTranslate);
         $this->translateExportJson();
-
-
-
-
-
-
     }
 
     private function processData(): void
@@ -225,15 +209,12 @@ class TranslateContent implements ShouldQueue
         }
 
         $this->pathToJson['slug'] = $this->content->slug;
-
     }
 
 
 
      private function translateExportJson()
     {
-
-
         $translatedItems = $this->pathToJson;
 
         foreach ($translatedItems as $key => $value) {
@@ -255,16 +236,11 @@ class TranslateContent implements ShouldQueue
 
         $this->content->slug($slug);
         $this->content->save();
-
-
-
     }
 
     private function setTranslatedValueByPath(&$entry, string $path, $value): void
     {
         $refs = &$entry;
-
-
         $keys = $this->pathStringToArrayKeys($path);
         $type = array_pop($keys);
         $lastKey = array_pop($keys);
@@ -306,10 +282,6 @@ class TranslateContent implements ShouldQueue
 
     function pathStringToArrayKeys($path) {
         $parts = explode('.', $path);
-
-
-
-
         $result = [];
         foreach ($parts as $part) {
             if (is_numeric($part)) {
@@ -343,10 +315,6 @@ class TranslateContent implements ShouldQueue
         return $localizableFields->toArray();
     }
 
-
-
-
-
     private function getTranslatableData(): void
     {
         // Ensure $this->defaultData is an array
@@ -376,13 +344,7 @@ class TranslateContent implements ShouldQueue
         if(!isset( $this->fieldKeys['allKeys']['text'])){
             $this->fieldKeys['allKeys']['text'] = [];
         }
-
-
-
-
     }
-
-
 
     private function getDataToTranslate(): void
     {
@@ -398,7 +360,6 @@ class TranslateContent implements ShouldQueue
 
     private function unsetSpecialFields(array $array): array
     {
-
         if ($this->contentType === 'entry') {
             unset($array['slug']);
         }
@@ -474,7 +435,6 @@ class TranslateContent implements ShouldQueue
     private function getTranslatableFieldKeys(array $fields): array
     {
         $result = [];
-
         foreach ($fields as $key => $field) {
 
             if (isset($field['type'])) {
@@ -599,8 +559,6 @@ class TranslateContent implements ShouldQueue
         return $result;
     }
 
-
-
     private function getTranslatableSetKeys(array $fields): array
     {
         $result = [];
@@ -641,57 +599,6 @@ class TranslateContent implements ShouldQueue
         }
 
         return $result;
-    }
-
-
-    function translateText($text, $apiKey, $targetLanguage) {
-
-        $postData = [
-            'auth_key' => $apiKey,
-            'text' => $text,
-            'target_lang' => 'EN'
-        ];
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, 'https://api.deepl.com/v2/translate');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
-
-        $response = curl_exec($ch);
-        curl_close($ch);
-
-        return json_decode($response, true);
-    }
-
-    private function translateData(): void
-    {
-        $this->translatedData = $this->arrayMapRecursive(
-            $this->dataToTranslate,
-            function ($value, $key) {
-                return $this->translate($value, $key);
-            }
-        );
-
-    }
-
-    private function translate($value, string $key)
-    {
-
-
-        // Check if '$key: $value' should be translated.
-        if (! $this->isTranslatableKeyValuePair($value, $key)) {
-            return $value;
-        }
-
-        // Translate HTML
-
-        if ($this->isHtml($value)) {
-            return $this->translateWithDeepL($value, 'html');
-        }
-
-        // Translate text
-        return $this->translateWithDeepL($value, 'text');
     }
 
     private function translateWithDeepL(string $text, string $format): string
@@ -737,11 +644,8 @@ class TranslateContent implements ShouldQueue
         }
     }
 
-
     private function isTranslatableKeyValuePair($value, string $key): bool
     {
-
-
         // Skip empty $value.
         if (empty($value)) {
             return false;
@@ -784,47 +688,7 @@ class TranslateContent implements ShouldQueue
             return false;
         }
 
-
-
         return true;
-    }
-
-    private function saveTranslation(): void
-    {
-
-        foreach ($this->translatedData as $key => $value) {
-
-            $this->content->set($key, $value);
-
-        }
-
-
-
-        $this->content->save();
-
-
-    }
-
-    private function arrayFilterRecursive(array $array, callable $callback = null): array
-    {
-        $array = is_callable($callback) ? array_filter($array, $callback) : array_filter($array);
-
-        foreach ($array as &$value) {
-            if (is_array($value)) {
-                $value = $this->arrayFilterRecursive($value, $callback);
-            }
-        }
-
-        return $array;
-    }
-
-    private function translateSlug(): void
-    {
-        $slug = $this->content->slug();
-        $translatedSlug = $this->translateWithDeepL($slug, 'text');
-
-
-        $this->content->slug($translatedSlug);
     }
 
     /**
@@ -848,42 +712,4 @@ class TranslateContent implements ShouldQueue
 
         return false;
     }
-
-    /**
-     * Recursively map an array to a callback function.
-     *
-     * @param array $array
-     * @param callable $callback
-     * @return array
-     */
-    private function arrayMapRecursive(array $array, callable $callback): array
-    {
-        $output = [];
-
-        foreach ($array as $key => $value) {
-            if (is_array($value)) {
-                $output[$key] = $this->arrayMapRecursive($value, $callback);
-            } else {
-                $output[$key] = $callback($value, $key);
-            }
-        }
-
-        return $output;
-    }
-
-    /**
-     * Check if the provided string is HTML or not.
-     *
-     * @param string $string
-     * @return bool
-     */
-    private function isHtml(string $string): bool
-    {
-        return $string != strip_tags($string);
-    }
-
-
-
-
-
 }
