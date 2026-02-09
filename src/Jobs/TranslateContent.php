@@ -647,7 +647,6 @@ class TranslateContent implements ShouldQueue
     function translateText($text, $apiKey, $targetLanguage) {
        
         $postData = [
-            'auth_key' => $apiKey,
             'text' => $text,
             'target_lang' => 'EN'
         ];
@@ -657,6 +656,9 @@ class TranslateContent implements ShouldQueue
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: DeepL-Auth-Key ' . $apiKey,
+        ]);
     
         $response = curl_exec($ch);
         curl_close($ch);
@@ -701,28 +703,24 @@ class TranslateContent implements ShouldQueue
       
 
         $postData = [
-            'auth_key' => $this->apiKeyPrivate,
             'text' => $text,
             'target_lang' => $this->language
         ];
 
-        $url = null;
-
-        if($this->isFreeApiKeyVersion == 1){
-            $url = 'https://api-free.deepl.com/v2/translate';
-        }else{
-            $url = 'https://api.deepl.com/v2/translate';
-        }
-
+        $url = $this->isFreeApiKeyVersion == 1
+            ? 'https://api-free.deepl.com/v2/translate'
+            : 'https://api.deepl.com/v2/translate';
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: DeepL-Auth-Key ' . $this->apiKeyPrivate,
+        ]);
 
         $response = curl_exec($ch);
-     
         curl_close($ch);
 
         $result = json_decode($response, true);
