@@ -272,7 +272,8 @@ class TranslateContent implements ShouldQueue
         if ($type === 'text') {
             $toSetValue = $value;
         } elseif ($type === 'bard') {
-            $toSetValue = (new Augmentor($this))->renderHtmlToProsemirror($value)['content'];
+            $html = is_string($value) && trim($value) !== '' ? $value : '<p></p>';
+            $toSetValue = (new Augmentor($this))->renderHtmlToProsemirror($html)['content'];
         } else {
             $toSetValue = $value;
         }
