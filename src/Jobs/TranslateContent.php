@@ -200,20 +200,20 @@ class TranslateContent implements ShouldQueue
         foreach ($data as $key => $value) {
             $currentPath = $path ? $path . '.' . $key : $key;
             
-            if ((isset($value['type']) && isset($value['content']))) {
+            $isProsemirrorNode = isset($value['type']) && isset($value['content'])
+                && !isset($value['text'])
+                && !isset($value['title']);
 
-               
-                $bardContent =  $value;
-               
+            if ($isProsemirrorNode) {
+                $bardContent = $value;
+
                 $html = (new Augmentor($this))->renderProsemirrorToHtml([
                     'type' => $bardContent['type'],
                     'content' => $bardContent['content'],
                 ]);
 
-
                 $this->pathToJson[$currentPath . '.bard'] = $html;
-            
-            }else if(is_array($value)) {
+            } elseif (is_array($value)) {
                     $this->dumpTranslatedPaths($value, $currentPath);
                 
             } else{
