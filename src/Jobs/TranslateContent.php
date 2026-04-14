@@ -75,12 +75,12 @@ class TranslateContent implements ShouldQueue
        
     }
 
-    
+
     public function config(): array
     {
         return [];
     }
-
+    
     public function handle()
     {
         $this->isFreeApiKeyVersion = env('AI_TRANSLATION_OPTION_FREE_VERSION');
@@ -353,8 +353,7 @@ class TranslateContent implements ShouldQueue
         // Ensure $this->defaultData is an array
         $this->defaultData = $this->defaultData->toArray();
 
-        // Ensure $this->translatableFields is an array 
-        // $this->translatableFields = $this->translatableFields->toArray();
+       
 
         $this->translatableData = array_intersect_key($this->defaultData, $this->translatableFields);
     }
@@ -415,62 +414,7 @@ class TranslateContent implements ShouldQueue
         return $array;
     }
 
-    // private function filterSupportedFieldtypes(array $fields): array
-    // {
-        
-    //     return collect($fields)
-    //         ->map(function ($item) {
-    //             if (!isset($item['type'])) {
-    //                 return null;
-    //             }
-    
-    //             switch ($item['type']) {
-    //                 case 'replicator':
-    //                 case 'bard':
-    //                     $item['sets'] = collect($item['sets'] ?? [])
-    //                         ->map(function ($set) {
-    //                             if (isset($set['fields'])) {
-    //                                 $set['fields'] = $this->filterSupportedFieldtypes($set['fields']);
-    //                             }
-    //                             return $set;
-    //                         })
-    //                         ->filter(function ($set) {
-    //                             return isset($set['fields']) && count($set['fields']) > 0;
-    //                         })
-    //                         ->toArray();
-    //                     break;
-    //                 case 'grid':
-    //                     if (isset($item['fields'])) {
-    //                         $item['fields'] = $this->filterSupportedFieldtypes($item['fields']);
-    //                     }
-    //                     break;
-    //             }
-    
-    //             return $item;
-    //         })
-    //         ->filter(function ($item) {
-    //             if (!isset($item['type'])) {
-    //                 return false;
-    //             }
-    
-    //             $supported = in_array($item['type'], $this->supportedFieldtypes);
-    
-    //             if (!$supported) {
-    //                 return false;
-    //             }
-    
-    //             switch ($item['type']) {
-    //                 case 'replicator':
-    //                     return isset($item['sets']) && count($item['sets']) > 0;
-    //                 case 'grid':
-    //                     return isset($item['fields']) && count($item['fields']) > 0;
-    //                 default:
-    //                     return true;
-    //             }
-    //         })
-    //         ->filter()
-    //         ->toArray();
-    // }
+   
 
     private function getTranslatableFieldKeys(array $fields): array
     {
@@ -644,58 +588,8 @@ class TranslateContent implements ShouldQueue
         return $result;
     }
 
-     
-    function translateText($text, $apiKey, $targetLanguage) {
-       
-        $postData = [
-            'text' => $text,
-            'target_lang' => 'EN'
-        ];
-    
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, 'https://api.deepl.com/v2/translate');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: DeepL-Auth-Key ' . $apiKey,
-        ]);
-    
-        $response = curl_exec($ch);
-        curl_close($ch);
-    
-        return json_decode($response, true);
-    }
 
-    private function translateData(): void
-    {
-        $this->translatedData = $this->arrayMapRecursive(
-            $this->dataToTranslate,
-            function ($value, $key) {
-                return $this->translate($value, $key);
-            }
-        );
-        
-    }
 
-    private function translate($value, string $key)
-    {
-   
-
-        // Check if '$key: $value' should be translated.
-        if (! $this->isTranslatableKeyValuePair($value, $key)) {
-            return $value;
-        }
-
-        // Translate HTML
-
-        if ($this->isHtml($value)) {
-            return $this->translateWithDeepL($value, 'html');
-        }
-
-        // Translate text
-        return $this->translateWithDeepL($value, 'text');
-    }
 
     private function translateWithDeepL(string $text, string $format): string
     {
@@ -778,10 +672,6 @@ class TranslateContent implements ShouldQueue
             return false;
         }
 
-        // Skip if $value is in the target locale.
-        // if ($this->service->detectLanguage($value) === $this->targetLocale) {
-        //     return false;
-        // }
 
         if (in_array($key, $this->excludedFields)) {
             return false;
@@ -792,43 +682,6 @@ class TranslateContent implements ShouldQueue
         return true;
     }
 
-    private function saveTranslation(): void
-    {
-       
-        foreach ($this->translatedData as $key => $value) {
-           
-            $this->content->set($key, $value);
-            
-        }
-        
-
-        
-        $this->content->save();
-       
-       
-    }
-
-    private function arrayFilterRecursive(array $array, callable $callback = null): array
-    {
-        $array = is_callable($callback) ? array_filter($array, $callback) : array_filter($array);
-
-        foreach ($array as &$value) {
-            if (is_array($value)) {
-                $value = $this->arrayFilterRecursive($value, $callback);
-            }
-        }
-
-        return $array;
-    }
-
-    private function translateSlug(): void
-    {
-        $slug = $this->content->slug();
-        $translatedSlug = $this->translateWithDeepL($slug, 'text');
-    
-       
-        $this->content->slug($translatedSlug);
-    }
 
     /**
      * Recursively check if a key exists in an array.
@@ -851,42 +704,5 @@ class TranslateContent implements ShouldQueue
 
         return false;
     }
-
-    /**
-     * Recursively map an array to a callback function.
-     *
-     * @param array $array
-     * @param callable $callback
-     * @return array
-     */
-    private function arrayMapRecursive(array $array, callable $callback): array
-    {
-        $output = [];
-
-        foreach ($array as $key => $value) {
-            if (is_array($value)) {
-                $output[$key] = $this->arrayMapRecursive($value, $callback);
-            } else {
-                $output[$key] = $callback($value, $key);
-            }
-        }
-
-        return $output;
-    }
-
-    /**
-     * Check if the provided string is HTML or not.
-     *
-     * @param string $string
-     * @return bool
-     */
-    private function isHtml(string $string): bool
-    {
-        return $string != strip_tags($string);
-    }
-
-  
-
-
    
 }

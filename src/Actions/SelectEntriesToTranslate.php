@@ -12,6 +12,13 @@ use Statamic\Facades\Page;
 
 class SelectEntriesToTranslate extends Action
 {
+
+    public $icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 5h16M9 3v2m6-2v2M10 9h4m0 0c-.5 2.5-2 5-4 6.5M14 9c.5 2.5 2 5 4 6.5"/>
+                    <path d="M5 20h6m-3-3v6"/>
+                </svg>';
+
+                
     public static function title()
     {
         return __('Translate');
@@ -26,7 +33,12 @@ class SelectEntriesToTranslate extends Action
     {
         return $this->isMultisite() && collect($items)->every(fn ($item) => $item instanceof \Statamic\Entries\Entry);
     }
-    
+
+
+    public function bypassesDirtyWarning(): bool
+    {
+        return true;
+    }
 
     protected function fieldItems()
     {
@@ -38,6 +50,12 @@ class SelectEntriesToTranslate extends Action
             $sites = Site::all()->filter(fn($site) => $site->handle() !== $currentSite);
     
             return [
+                'warning' => [
+                    'type' => 'html',
+                    'html' => '<div class=" text-sm text-red-500 rounded">
+                                ' . __('The page will refresh after translating, unsaved changes will be lost.') . '
+                            </div>',
+                ],
                 'language' => [
                     'type' => 'select',
                     'label' => __('Pick a language'),
@@ -71,9 +89,23 @@ class SelectEntriesToTranslate extends Action
         if ($siteData) {
             $controller = new TranslateController();
             $controller->index($items, $siteData, $shortLocale);
+            
         } else {
             return __('Something went wrong');
         }
+    }
+
+    public function redirect($items, $values)
+    {
+        $isQueued = config('queue.default') !== 'sync';
+
+        if ($isQueued) {
+            session()->flash('info', __('Translation is queued and will run in the background.'));
+        } else {
+            session()->flash('success', __('Translation is completed.'));
+        }
+
+        return request()->header('referer'); 
     }
 
     private function isMultisite()
