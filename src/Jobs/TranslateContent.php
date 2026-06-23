@@ -76,9 +76,13 @@ class TranslateContent implements ShouldQueue
     }
 
 
-    public function config(): array
+    public function config(?string $key = null, mixed $fallback = null): mixed
     {
-        return [];
+        $config = [];
+
+        return $key !== null
+            ? ($config[$key] ?? $fallback)
+            : $config;
     }
     
     public function handle()
