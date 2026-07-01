@@ -12,6 +12,7 @@ use Statamic\Facades\Page;
 
 class SelectEntriesToTranslate extends Action
 {
+    protected $translationFailed = false;
 
     public $icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 5h16M9 3v2m6-2v2M10 9h4m0 0c-.5 2.5-2 5-4 6.5M14 9c.5 2.5 2 5 4 6.5"/>
@@ -35,6 +36,7 @@ class SelectEntriesToTranslate extends Action
     }
 
 
+
     public function bypassesDirtyWarning(): bool
     {
         return true;
@@ -47,7 +49,7 @@ class SelectEntriesToTranslate extends Action
             $currentSite = Site::selected()->handle();
    
         
-            $sites = Site::all()->filter(fn($site) => $site->handle() !== $currentSite);
+            $sites = Site::all();
     
             return [
                 'warning' => [
@@ -79,13 +81,25 @@ class SelectEntriesToTranslate extends Action
         $currentSite = Site::selected()->handle();
        
         
-        $sites = Site::all()->filter(fn($site) => $site->handle() !== $currentSite);
+        $sites = Site::all();
 
         $chosenLanguage = $values['language']; 
 
         $siteData = $sites->firstWhere('locale', $chosenLanguage);
         $shortLocale = $siteData->short_locale;
+
+        
+
+        foreach($items ?? [] as $item){
+            $locale = $item->locale;
+            if($locale == $siteData->handle){
+                $this->translationFailed = true;
+                throw new \Exception(__('This entry is already in the selected language and cannot be translated.'));
+            }
+            break;
+        }
        
+      
         if ($siteData) {
             $controller = new TranslateController();
             $controller->index($items, $siteData, $shortLocale);
@@ -97,6 +111,10 @@ class SelectEntriesToTranslate extends Action
 
     public function redirect($items, $values)
     {
+        if ($this->translationFailed) {
+            return false;
+        }
+
         $isQueued = config('queue.default') !== 'sync';
 
         if ($isQueued) {

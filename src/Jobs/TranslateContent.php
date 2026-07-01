@@ -10,7 +10,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Statamic\Facades\Entry;
-use Statamic\Facades\Collection;
 use Illuminate\Http\Request;
 use Statamic\Fieldtypes\Bard\Augmentor;
 
@@ -97,69 +96,44 @@ class TranslateContent implements ShouldQueue
         }
 
         $page = Entry::query()
-                    ->where('id', $this->row)
-                    ->first();
+            ->where('id', $this->row)
+            ->first();
 
-        if($page->locale == $this->siteData->handle){
+        if (! $page) {
             return;
         }
-    
-         
-    
-        $pageLocalizations = $page->descendants();
-        $origin = null;
-        if ($page->origin()) {
-            $origin = Entry::query()->where('id', $page->origin()->id)->first();
-                if($origin){
-                    if($origin->locale == $this->siteData->handle){
-                       $pageLocalizations = [$origin];
-                       
-                       
-                    }
-                }
-            
+
+        $targetSite = $this->siteData->handle;
+
+        if ($page->locale() === $targetSite) {
+            return;
         }
-        
-      
-       
-        $translatedPageExists = false;
-        $newPage = null;
-       
-        foreach($pageLocalizations as $pageTranslation){
-            if($pageTranslation->locale == $this->siteData->handle){
-                $translatedPageExists = true;
-                $newPage = $pageTranslation;
-                
-                $newPage->data($page->data());
-             
-                $this->translatedContent = $newPage;
-                break;
+
+        $existingTranslation = $page->in($targetSite);
+
+        if ($existingTranslation) {
+            $newPage = $existingTranslation;
+            $this->copyLocalizableFieldsFromSource($newPage, $page);
+            $this->translatedContent = $newPage;
+        } else {
             
-            } 
-        }
-        
-        if($translatedPageExists == false){
-     
-            $slug = $page->slug();
-            
-            $response = $this->translateWithDeepl($slug, $this->apiKeyPrivate);
-            if (isset($response['translations'][0]['text'])) {
-                $slug = $response['translations'][0]['text'];
-                
+            $slugIsLocalizable = $this->isSlugLocalizable($page);
+
+            if($slugIsLocalizable){
+                $slug = $this->translateWithDeepL($page->slug(), 'text');
+            }else{
+                $slug = $page->slug();
             }
-            
-            $newPage =  Entry::make()
+
+            $newPage = $page->root()
+                ->makeLocalization($targetSite)
                 ->slug($slug)
-                ->origin($page->id)
-                ->locale($this->siteData->handle)
-                ->collection(Collection::findByHandle($page->collection->handle))
-                ->data($page->data())
-                ->blueprint($page->blueprint->handle);
-        
-            
+                ->blueprint($page->blueprint()->handle());
+
+            $this->copyLocalizableFieldsFromSource($newPage, $page);
             $newPage->save();
-        
-            $this->translatedContent = Entry::find($newPage->id);
+
+            $this->translatedContent = Entry::find($newPage->id());
         }
 
 
@@ -197,6 +171,28 @@ class TranslateContent implements ShouldQueue
         $this->getTranslatableData();
         $this->getFieldKeys();
         $this->getDataToTranslate();
+    }
+
+   
+    private function copyLocalizableFieldsFromSource($target, $source): void
+    {
+        $blueprint = $source->blueprint();
+
+        if (! $blueprint) {
+            return;
+        }
+
+        $localizableFields = $blueprint->fields()->localizable()->all()->map->handle()->all();
+
+
+        foreach ($localizableFields as $field) {
+            $target->set($field, $source->value($field));
+        }
+    }
+
+    private function isSlugLocalizable($source): bool
+    {
+        return in_array('slug', $source->blueprint()->fields()->localizable()->all()->map->handle()->all());
     }
 
     private function dumpTranslatedPaths(array $data = [], $path = ''): void
@@ -337,14 +333,7 @@ class TranslateContent implements ShouldQueue
         $localizableFields = $fields->filter(function ($field) {
             return isset($field->config()['localizable']) && $field->config()['localizable'] === true;
         });
-    
-        // Add the title field, so it can be translated.
-        if ($this->contentType !== 'globals' && ! $localizableFields->has('title')) {
-            $localizableFields->put('title', [
-                'type' => 'text',
-                'localizable' => true,
-            ]);
-        }
+
         return $localizableFields->toArray();
     }
 
