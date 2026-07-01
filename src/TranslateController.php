@@ -35,7 +35,7 @@ class TranslateController
 
     private $translatedData;
  
-    public function index($data, $siteData, $shortLocale)
+    public function index($data, $siteData, $shortLocale, $isTerm)
     {
        
         $this->apiKeyPrivate = config('ai-translator.ai-translator.ai_translator_api_key');
@@ -44,7 +44,7 @@ class TranslateController
   
         foreach($data as $row){
           
-            TranslateContent::dispatch($row->id, $siteData, $this->apiKeyPrivate, $shortLocale);
+            TranslateContent::dispatch($row->id, $siteData, $this->apiKeyPrivate, $shortLocale, $isTerm);
         }
 
         

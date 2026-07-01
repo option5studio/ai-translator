@@ -22,6 +22,7 @@ use Statamic\Facades\Blueprint;
 use Statamic\Facades\Content;
 use App\Helpers\Utils;
 use Illuminate\Support\Facades\Http;
+use Statamic\Facades\Term;
 
 
 class TranslateContent implements ShouldQueue
@@ -59,10 +60,12 @@ class TranslateContent implements ShouldQueue
     private $siteData;
     private $isFreeApiKeyVersion;
 
+    private $isTerm = false;
+
     private $pathToJson = [];
    
 
-    public function __construct($row, $siteData, $apiKeyPrivate, $language)
+    public function __construct($row, $siteData, $apiKeyPrivate, $language, $isTerm)
     {
         $this->row = $row; 
         $this->siteData = $siteData;
@@ -70,7 +73,7 @@ class TranslateContent implements ShouldQueue
        
         $this->apiKeyPrivate = $apiKeyPrivate;
         $this->language = $language;
-     
+        $this->isTerm = $isTerm;
        
     }
 
@@ -95,9 +98,13 @@ class TranslateContent implements ShouldQueue
 
         }
 
-        $page = Entry::query()
+        if($this->isTerm){
+            $page = Term::find($this->row);
+        }else{
+            $page = Entry::query()
             ->where('id', $this->row)
             ->first();
+        }
 
         if (! $page) {
             return;
@@ -116,7 +123,6 @@ class TranslateContent implements ShouldQueue
             $this->copyLocalizableFieldsFromSource($newPage, $page);
             $this->translatedContent = $newPage;
         } else {
-            
             $slugIsLocalizable = $this->isSlugLocalizable($page);
 
             if($slugIsLocalizable){
@@ -142,7 +148,11 @@ class TranslateContent implements ShouldQueue
         
         $this->content =  $this->translatedContent;
         
-        $this->contentType = $this->content->collection()->handle();
+        if($this->isTerm){
+            $this->contentType = 'term';
+        }else{
+            $this->contentType = $this->content->collection()->handle();
+        }
         
 
         
@@ -277,7 +287,7 @@ class TranslateContent implements ShouldQueue
         } else {
             $toSetValue = $value;
         }
-    
+        
         foreach ($keys as $key) {
             if (is_numeric($key)) {
                 $key = (int)$key;

@@ -3,10 +3,10 @@
 namespace AiTranslator\Actions;
 
 use Statamic\Actions\Action;
+use Statamic\Contracts\Entries\Entry;
 use Statamic\Facades\Site;
 use AiTranslator\TranslateController;
-use Statamic\Facades\Entry;
-use Statamic\Facades\Page;
+use Statamic\Contracts\Taxonomies\Term;
 
 
 
@@ -25,14 +25,22 @@ class SelectEntriesToTranslate extends Action
         return __('Translate');
     }
 
-    public function visibleToItem($item)
+    public function visibleTo($item)
     {
-        return $this->isMultisite() && $item instanceof \Statamic\Entries\Entry;
-    }
     
+        if (! $this->isMultisite()) {
+            return false;
+        }
+       
+        if ($item instanceof Term && ($this->context['view'] ?? null) === 'form') {
+            return false;
+        }
+        return $item instanceof Entry || $item instanceof Term;
+    }
+
     public function visibleToBulk($items)
     {
-        return $this->isMultisite() && collect($items)->every(fn ($item) => $item instanceof \Statamic\Entries\Entry);
+        return $this->isMultisite() && ($items->every(fn ($item) => $item instanceof Entry || $item instanceof Term));
     }
 
 
@@ -88,10 +96,17 @@ class SelectEntriesToTranslate extends Action
         $siteData = $sites->firstWhere('locale', $chosenLanguage);
         $shortLocale = $siteData->short_locale;
 
+
+        $isTerm = false;
         
 
         foreach($items ?? [] as $item){
             $locale = $item->locale;
+
+            if($item instanceof Term){
+                $isTerm = true;
+            }
+
             if($locale == $siteData->handle){
                 $this->translationFailed = true;
                 throw new \Exception(__('This entry is already in the selected language and cannot be translated.'));
@@ -102,7 +117,7 @@ class SelectEntriesToTranslate extends Action
       
         if ($siteData) {
             $controller = new TranslateController();
-            $controller->index($items, $siteData, $shortLocale);
+            $controller->index($items, $siteData, $shortLocale, $isTerm);
             
         } else {
             return __('Something went wrong');
