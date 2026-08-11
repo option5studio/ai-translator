@@ -22,8 +22,6 @@ class SettingsController extends CpController
         $user = Auth::user();
         if (!$user) {
             return redirect('/');
-        } elseif (!$user->super) {
-            return redirect('/');
         }
 
         if (class_exists('Statamic\CP\PublishForm')) {
