@@ -23,6 +23,7 @@ use Statamic\Facades\Content;
 use App\Helpers\Utils;
 use Illuminate\Support\Facades\Http;
 use Statamic\Facades\Term;
+use Statamic\Support\Str;
 
 
 class TranslateContent implements ShouldQueue
@@ -61,6 +62,8 @@ class TranslateContent implements ShouldQueue
     private $isFreeApiKeyVersion;
 
     private $isTerm = false;
+
+    private bool $slugIsLocalizable = false;
 
     private $pathToJson = [];
    
@@ -110,6 +113,8 @@ class TranslateContent implements ShouldQueue
             return;
         }
 
+        $this->slugIsLocalizable = $this->isSlugLocalizable($page);
+
         $targetSite = $this->siteData->handle;
 
         if ($page->locale() === $targetSite) {
@@ -123,13 +128,9 @@ class TranslateContent implements ShouldQueue
             $this->copyLocalizableFieldsFromSource($newPage, $page);
             $this->translatedContent = $newPage;
         } else {
-            $slugIsLocalizable = $this->isSlugLocalizable($page);
-
-            if($slugIsLocalizable){
-                $slug = $this->translateWithDeepL($page->slug(), 'text');
-            }else{
-                $slug = $page->slug();
-            }
+            $slug = $this->slugIsLocalizable
+                ? $this->translateSlug($page->slug())
+                : $page->slug();
 
             $newPage = $page->root()
                 ->makeLocalization($targetSite)
@@ -233,41 +234,48 @@ class TranslateContent implements ShouldQueue
             }
 
         }
-        
-        $this->pathToJson['slug'] = $this->content->slug;
 
+        if ($this->slugIsLocalizable) {
+            $this->pathToJson['slug'] = $this->content->slug();
+        }
     }
 
    
 
-     private function translateExportJson()
+    private function translateExportJson(): void
     {
-       
-       
         $translatedItems = $this->pathToJson;
+        $translatedSlug = null;
 
         foreach ($translatedItems as $key => $value) {
-            $path = $key;
+            if ($key === 'slug') {
+                $translatedSlug = $this->translateSlug((string) $value);
+
+                continue;
+            }
 
             $translatedValue = $this->translateWithDeepL($value, 'text');
-            $this->setTranslatedValueByPath($this->dataToTranslate, $path, $translatedValue);
-
+            $this->setTranslatedValueByPath($this->dataToTranslate, $key, $translatedValue);
         }
-       
+
         foreach ($this->dataToTranslate as $key => $value) {
-           
             $this->content->set($key, $value);
-            
         }
-        
-        $slug = $translatedItems['slug'];
-    
-       
-        $this->content->slug($slug);
+
+        if ($this->slugIsLocalizable && $translatedSlug !== null) {
+            $this->content->slug($translatedSlug);
+        }
+
         $this->content->save();
+    }
 
-       
+    protected function translateSlug(string $slug): string
+    {
+        if ($slug === '') {
+            return $slug;
+        }
 
+        return Str::slug($this->translateWithDeepL($slug, 'text'));
     }
 
     private function setTranslatedValueByPath(&$entry, string $path, $value): void

@@ -65,7 +65,7 @@ class SettingsController extends CpController
     public function save(Request $request)
     {
         $user = Auth::user();
-        if (!$user || !$user->super) {
+        if (!$user) {
             return redirect('/');
         }
         if (class_exists('Statamic\CP\PublishForm')) {
